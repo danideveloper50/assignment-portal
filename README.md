@@ -1,21 +1,26 @@
-# Assignment Portal
+# Assignment Submission Portal
 
-Simple Express app for submitting assignments, with Jest tests and a GitHub Actions CI pipeline.
-
-## Structure
-
-- `app.js` – Express app (exported for tests)
-- `server.js` – starts the server (entry point)
-- `views/index.html` – frontend form + submission list
-- `tests/submission.test.js` – Jest/Supertest tests
-- `receiver.js` – local HTTP report receiver
-- `.github/workflows/ci.yml` – GitHub Actions pipeline
-
-## Usage
-
-```bash
+## Run the Application
+```
 npm install
-npm start        # http://localhost:3000
-npm test         # run tests
-npm run receiver # report receiver on :4000
+node server.js
+# Visit http://localhost:3000
+```
+
+## Run Tests Locally
+```
+npm test
+```
+
+## Start the Local Report Receiver
+```
+node receiver.js
+# Listens on http://localhost:4000
+```
+
+## Tunnel Setup (for GitHub Actions → localhost)
+```
+ngrok http 4000
+# Copy the https://xxxx.ngrok-free.app URL
+# Add it as a GitHub secret: RECEIVER_URL
 ```

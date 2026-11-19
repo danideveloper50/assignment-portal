@@ -1,39 +1,64 @@
 const request = require('supertest');
 const app = require('../app');
 
-beforeEach(() => app.resetSubmissions());
+beforeEach(async () => {
+  // Clear submissions before each test
+  await request(app).delete('/submissions');
+});
 
-describe('Assignment portal', () => {
-  test('GET /health returns ok', async () => {
-    const res = await request(app).get('/health');
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual({ status: 'ok' });
-  });
+describe('Assignment Submission Portal', () => {
 
-  test('GET / serves the frontend', async () => {
-    const res = await request(app).get('/');
-    expect(res.statusCode).toBe(200);
-    expect(res.text).toContain('Assignment Portal');
-  });
-
-  test('POST /api/submissions creates a submission', async () => {
+  // TEST 1: Valid submission is saved
+  test('saves a valid submission with complete details', async () => {
     const res = await request(app)
-      .post('/api/submissions')
-      .send({ studentName: 'Ali', rollNo: 'FA21-BCS-001', title: 'DevOps Lab' });
-    expect(res.statusCode).toBe(201);
-    expect(res.body).toMatchObject({ id: 1, studentName: 'Ali' });
+      .post('/submit')
+      .send({
+        name: 'Muhammad Daniyal',
+        regNumber: 'FA23-BAI-009',
+        title: 'DevOps Lab Mid',
+        url: 'https://github.com/danideveloper50/assignment-portal'
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.message).toBe('Submission saved.');
+
+    // Verify it appears in the list
+    const listRes = await request(app).get('/submissions');
+    expect(listRes.body.length).toBe(1);
+    expect(listRes.body[0].regNumber).toBe('FA23-BAI-009');
   });
 
-  test('POST /api/submissions rejects missing fields', async () => {
-    const res = await request(app).post('/api/submissions').send({ studentName: 'Ali' });
-    expect(res.statusCode).toBe(400);
+  // TEST 2: Missing registration number is rejected
+  test('rejects submission with missing registration number', async () => {
+    const res = await request(app)
+      .post('/submit')
+      .send({
+        name: 'Muhammad Daniyal',
+        regNumber: '',  // empty
+        title: 'DevOps Lab Mid',
+        url: 'https://github.com/example/repo'
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
   });
 
-  test('GET /api/submissions lists submissions', async () => {
-    await request(app)
-      .post('/api/submissions')
-      .send({ studentName: 'Sara', rollNo: 'FA21-BCS-002', title: 'CI/CD' });
-    const res = await request(app).get('/api/submissions');
-    expect(res.body).toHaveLength(1);
+  // TEST 3: Invalid URL is rejected and not saved
+  test('rejects submission with invalid URL', async () => {
+    const res = await request(app)
+      .post('/submit')
+      .send({
+        name: 'Muhammad Daniyal',
+        regNumber: 'FA23-BAI-009',
+        title: 'DevOps Lab Mid',
+        url: 'not-a-valid-url'
+      });
+
+    expect(res.status).toBe(400);
+
+    // Verify nothing was saved
+    const listRes = await request(app).get('/submissions');
+    expect(listRes.body.length).toBe(0);
   });
+
 });

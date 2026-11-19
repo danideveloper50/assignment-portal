@@ -1,24 +1,84 @@
-name: CI
+
+name: CI Pipeline
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches: ['*']
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: '18'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Run tests
-        run: npm test
+      - name: Run tests and capture results
+        id: tests
+        run: |
+          npm test -- --json --outputFile=test-results.json 2>&1 || true
+          # Parse test results into environment variables
+          node -e "
+            const r = require('./test-results.json');
+            const passed = r.numPassedTests;
+            const failed = r.numFailedTests;
+            const total  = r.numTotalTests;
+            const status = failed === 0 ? 'passed' : 'failed';
+            const tests  = r.testResults[0].testResults.map(t => ({
+              name: t.title,
+              result: t.status === 'passed' ? 'passed' : 'failed',
+              failureMessage: t.failureMessages.join(' ') || null
+            }));
+            const fs = require('fs');
+            fs.writeFileSync('parsed-results.json', JSON.stringify({
+              passed, failed, total, status, tests
+            }));
+          "
+
+      - name: Send report to local receiver
+        run: |
+          PARSED=$(cat parsed-results.json)
+          PAYLOAD=$(node -e "
+            const p = JSON.parse(process.argv[1]);
+            const report = {
+              repository: '${{ github.repository }}',
+              branch: '${{ github.ref_name }}',
+              commitSHA: '${{ github.sha }}',
+              pipelineRunId: '${{ github.run_id }}',
+              timestamp: new Date().toISOString(),
+              tests: p.tests,
+              summary: {
+                total: p.total,
+                passed: p.passed,
+                failed: p.failed,
+                status: p.status
+              }
+            };
+            console.log(JSON.stringify(report));
+          " "$PARSED")
+
+          echo "Sending report to receiver..."
+          curl -X POST "${{ secrets.RECEIVER_URL }}/report" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            --fail --max-time 30 || echo "⚠ Receiver not reachable"
+
+      - name: Fail pipeline if tests failed
+        run: |
+          STATUS=$(node -e "
+            const r = require('./parsed-results.json');
+            console.log(r.status);
+          ")
+          if [ "$STATUS" = "failed" ]; then
+            echo "❌ Tests failed!"
+            exit 1
+          fi
+          echo "✅ All tests passed!"
