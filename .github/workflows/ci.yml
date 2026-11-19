@@ -83,3 +83,53 @@ jobs:
             exit 1
           fi
           echo "✅ All tests passed!"
+  deploy:
+    needs: test
+    if: success() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './views'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Send email report
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: |
+            [${{ github.repository }}] Test Report — Commit ${{ github.sha }}
+          to: ${{ secrets.REPORT_EMAIL }}
+          from: CI Pipeline <${{ secrets.EMAIL_USERNAME }}>
+          body: |
+            🔔 Test Report for ${{ github.repository }}
+
+            Branch  : ${{ github.ref_name }}
+            Commit  : ${{ github.sha }}
+            Run ID  : ${{ github.run_id }}
+            Status  : Check parsed-results.json
+
+            Full results are attached below.
+          attachments: parsed-results.json          
