@@ -68,6 +68,7 @@ jobs:
           echo "Sending report to receiver..."
           curl -X POST "${{ secrets.RECEIVER_URL }}/report" \
             -H "Content-Type: application/json" \
+            -H "ngrok-skip-browser-warning: true" \
             -d "$PAYLOAD" \
             --fail --max-time 30 || echo "⚠ Receiver not reachable"
 
