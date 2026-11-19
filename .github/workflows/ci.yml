@@ -32,7 +32,7 @@ jobs:
             const failed = r.numFailedTests;
             const total  = r.numTotalTests;
             const status = failed === 0 ? 'passed' : 'failed';
-            const tests  = r.testResults[0].testResults.map(t => ({
+            const tests  = r.testResults.flatMap(s => s.assertionResults).map(t => ({
               name: t.title,
               result: t.status === 'passed' ? 'passed' : 'failed',
               failureMessage: t.failureMessages.join(' ') || null

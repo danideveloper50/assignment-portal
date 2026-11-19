@@ -1,3 +1,4 @@
 node_modules/
 testreport.json
-.env
+.envtest-results.json
+parsed-results.json
